@@ -7,6 +7,7 @@ use Directus\Application\Http\Request;
 use Directus\Application\Http\Response;
 use Directus\Application\Route;
 use function Directus\array_get;
+use function Directus\get_directus_setting;
 use Directus\Authentication\Exception\UserWithEmailNotFoundException;
 use Directus\Authentication\Sso\Social;
 use Directus\Services\AuthService;
@@ -43,10 +44,12 @@ class Auth extends Route
         $this->validateRequestPayload($request);
         /** @var AuthService $authService */
         $authService = $this->container->get('services')->get('auth');
-
+        $recaptchaResponse=get_directus_setting('google_recaptcha_secret') != null ? $request->getParsedBodyParam('recaptcha_response') : null;
+        
         $responseData = $authService->loginWithCredentials(
             $request->getParsedBodyParam('email'),
-            $request->getParsedBodyParam('password')
+            $request->getParsedBodyParam('password'),
+            $recaptchaResponse
         );
 
         return $this->responseWithData($request, $response, $responseData);

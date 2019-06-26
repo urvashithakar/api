@@ -10,6 +10,7 @@ use Directus\Authentication\Exception\ExpiredResetPasswordToken;
 use Directus\Authentication\Exception\InvalidResetPasswordTokenException;
 use Directus\Authentication\Exception\UserNotFoundException;
 use Directus\Authentication\Exception\UserWithEmailNotFoundException;
+use Directus\Authentication\Exception\InvalidRecaptchaResponseException;
 use Directus\Authentication\Sso\OneSocialProvider;
 use Directus\Authentication\Provider;
 use Directus\Authentication\Sso\Social;
@@ -21,6 +22,8 @@ use Directus\Exception\UnprocessableEntityException;
 use Directus\Util\ArrayUtils;
 use Directus\Util\JWTUtils;
 use Directus\Util\StringUtils;
+use function Directus\get_directus_setting;
+
 
 class AuthService extends AbstractService
 {
@@ -34,12 +37,15 @@ class AuthService extends AbstractService
      *
      * @throws UnauthorizedException
      */
-    public function loginWithCredentials($email, $password)
+    public function loginWithCredentials($email, $password,$recaptchaResponse=null)
     {
-        $this->validateCredentials($email, $password);
+        $this->validateCredentials($email, $password, $recaptchaResponse);
 
         /** @var Provider $auth */
         $auth = $this->container->get('auth');
+        if($recaptchaResponse != null) {
+            $this->validateCaptcha($recaptchaResponse);
+        }
 
         /** @var UserInterface $user */
         $user = $auth->login([
@@ -60,6 +66,36 @@ class AuthService extends AbstractService
                 'token' => $this->generateAuthToken($user)
             ]
         ];
+    }
+    /**
+     * Validate the Google Recaptcha Token  
+     *
+     * @param string $google_recaptcha_token
+     * 
+     *
+     * @return array
+     *
+     * 
+     */
+
+    public function validateCaptcha ($recaptchaResponse){
+
+        $client = new \GuzzleHttp\Client();
+        // Create a POST request
+        $response = $client->request(
+            'POST',
+            'https://www.google.com/recaptcha/api/siteverify',
+            [
+                'form_params' => [
+                    'secret' => get_directus_setting('google_recaptcha_secret'),
+                    'response' => $recaptchaResponse
+                ]
+            ]
+        );
+        $response = json_decode($response->getBody(),true);
+        if($response['success'] == false){
+            throw new InvalidRecaptchaResponseException();
+        };
     }
 
     /**
@@ -393,7 +429,7 @@ class AuthService extends AbstractService
      *
      * @throws UnprocessableEntityException
      */
-    protected function validateCredentials($email, $password)
+    protected function validateCredentials($email, $password, $recaptchaResponse = null)
     {
         $payload = [
             'email' => $email,
@@ -404,6 +440,15 @@ class AuthService extends AbstractService
             'password' => 'required|string'
         ];
 
+        $google_recaptcha = get_directus_setting('google_recaptcha_secret');
+        if($google_recaptcha != null) {
+            $payload += [
+                'recaptcha_response' => $recaptchaResponse
+            ];
+            $constraints += [
+                'recaptcha_response' => 'required'
+            ];
+        }
         // throws an exception if the constraints are not met
         $this->validate($payload, $constraints);
     }
