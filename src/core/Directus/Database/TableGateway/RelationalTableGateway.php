@@ -595,7 +595,7 @@ class RelationalTableGateway extends BaseTableGateway
             // TODO : Need to redevelop this logic.
             if ($field->getType() == "file" && isset($parentRow[$fieldName][$primaryKey])) {
                 $parentRow[$fieldName] = $parentRow[$fieldName][$primaryKey];
-                return $parentRow;
+                //return $parentRow;
             }
 
             if ($primaryKey && ArrayUtils::get($foreignRow, $this->deleteFlag) === true) {
@@ -609,7 +609,7 @@ class RelationalTableGateway extends BaseTableGateway
             }
 
             // Update/Add foreign record
-            if ($this->recordDataContainsNonPrimaryKeyData($foreignRow, $foreignTableSchema->getPrimaryKeyName())) {
+            if ($this->recordDataContainsNonPrimaryKeyData($foreignRow, $foreignTableSchema->getPrimaryKeyName()) && $field->getType() != "file") {
                 // NOTE: using manageRecordUpdate instead of addOrUpdateRecordByArray to update related data
                 $foreignRow = $ForeignTable->manageRecordUpdate($foreignTableName, $foreignRow);
             }
